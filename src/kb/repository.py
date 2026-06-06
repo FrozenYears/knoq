@@ -4,11 +4,9 @@ import hashlib
 import json
 import re
 import sqlite3
-from pathlib import Path
 
 from kb.db import get_connection
 from kb.models import Entry
-from kb.search import _row_to_entry
 
 
 def make_slug(title: str) -> str:
@@ -44,7 +42,6 @@ def add_entry(title: str, content_md: str, tags: list[str] | None = None, source
         )
         rowid = cursor.lastrowid
         conn.commit()
-
         return Entry(
             id=rowid, slug=slug, title=title, content_md=content_md,
             summary=summary, source_path=source_path, hash=h,
@@ -56,12 +53,44 @@ def add_entry(title: str, content_md: str, tags: list[str] | None = None, source
         conn.close()
 
 
+def update_entry(slug: str, title: str | None = None, content_md: str | None = None,
+                 tags: list[str] | None = None) -> Entry | None:
+    """更新已有条目"""
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT * FROM entries WHERE slug = ?", (slug,)).fetchone()
+        if not row:
+            return None
+
+        new_title = title or row["title"]
+        new_content = content_md if content_md is not None else row["content_md"]
+        new_summary = new_content[:200].split("\n")[0] if new_content else ""
+        new_hash = content_hash(new_content)
+        new_tags = json.dumps(tags, ensure_ascii=False) if tags is not None else row["tags"]
+        now = Entry.now_iso()
+
+        conn.execute(
+            """UPDATE entries SET title=?, content_md=?, summary=?, hash=?, tags=?, updated_at=?
+            WHERE slug=?""",
+            (new_title, new_content, new_summary, new_hash, new_tags, now, slug),
+        )
+        conn.commit()
+
+        return Entry(
+            id=row["id"], slug=slug, title=new_title, content_md=new_content,
+            summary=new_summary, source_path=row["source_path"], hash=new_hash,
+            tags=tags or json.loads(row["tags"]), created_at=row["created_at"], updated_at=now,
+        )
+    finally:
+        conn.close()
+
+
 def get_entry(slug: str) -> Entry | None:
     """按 slug 获取条目"""
     conn = get_connection()
     try:
         row = conn.execute("SELECT * FROM entries WHERE slug = ?", (slug,)).fetchone()
-        return _row_to_entry(row) if row else None
+        return Entry.from_row(row) if row else None
     finally:
         conn.close()
 
@@ -74,7 +103,7 @@ def list_entries(limit: int = 50, offset: int = 0) -> list[Entry]:
             "SELECT * FROM entries ORDER BY updated_at DESC LIMIT ? OFFSET ?",
             (limit, offset),
         ).fetchall()
-        return [_row_to_entry(r) for r in rows]
+        return [Entry.from_row(r) for r in rows]
     finally:
         conn.close()
 

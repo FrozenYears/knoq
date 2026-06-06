@@ -11,8 +11,8 @@ def extract_title(content: str, fallback: str = "untitled") -> str:
 
 
 def extract_tags(content: str) -> list[str]:
-    """从内容提取标签（#tag 格式）"""
-    return list(set(re.findall(r"(?:^|\s)#([a-zA-Z][\w-]*)", content)))
+    """从内容提取标签（#tag 格式，支持中文）"""
+    return list(set(re.findall(r"(?:^|\s)#([\w][\w-]*)", content, re.UNICODE)))
 
 
 def extract_summary(content: str, max_len: int = 200) -> str:

@@ -2,7 +2,6 @@
 
 import re
 import sqlite3
-import json
 from dataclasses import dataclass
 
 from kb.db import get_connection
@@ -43,26 +42,20 @@ def search(query: str, limit: int = 20) -> list[SearchResult]:
     conn = get_connection()
     try:
         if _has_cjk(query):
-            # CJK 文本：用 LIKE 搜索（FTS5 unicode61 对中文分词不佳）
             like_pattern = f"%{query}%"
             rows = conn.execute(
                 """
                 SELECT * FROM entries
                 WHERE title LIKE ? OR content_md LIKE ? OR summary LIKE ?
-                ORDER BY updated_at DESC
-                LIMIT ?
+                ORDER BY updated_at DESC LIMIT ?
                 """,
                 (like_pattern, like_pattern, like_pattern, limit),
             ).fetchall()
-
-            results = []
-            for row in rows:
-                entry = _row_to_entry(row)
-                snippet = _make_snippet(entry.content_md, query)
-                results.append(SearchResult(entry=entry, rank=0.0, snippet=snippet))
-            return results
+            return [
+                SearchResult(entry=Entry.from_row(r), rank=0.0, snippet=_make_snippet(r["content_md"], query))
+                for r in rows
+            ]
         else:
-            # ASCII 文本：用 FTS5 全文搜索
             rows = conn.execute(
                 """
                 SELECT e.*, rank,
@@ -70,34 +63,13 @@ def search(query: str, limit: int = 20) -> list[SearchResult]:
                 FROM entries_fts
                 JOIN entries e ON e.id = entries_fts.rowid
                 WHERE entries_fts MATCH ?
-                ORDER BY rank
-                LIMIT ?
+                ORDER BY rank LIMIT ?
                 """,
                 (query, limit),
             ).fetchall()
-
-            results = []
-            for row in rows:
-                entry = _row_to_entry(row)
-                results.append(
-                    SearchResult(entry=entry, rank=row["rank"], snippet=row["snip"])
-                )
-            return results
+            return [
+                SearchResult(entry=Entry.from_row(r), rank=r["rank"], snippet=r["snip"])
+                for r in rows
+            ]
     finally:
         conn.close()
-
-
-def _row_to_entry(row: sqlite3.Row) -> Entry:
-    """将数据库行转为 Entry 对象"""
-    return Entry(
-        id=row["id"],
-        slug=row["slug"],
-        title=row["title"],
-        content_md=row["content_md"],
-        summary=row["summary"],
-        source_path=row["source_path"],
-        hash=row["hash"],
-        tags=json.loads(row["tags"]),
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-    )

@@ -37,7 +37,7 @@ def add(
         if sys.stdin.isatty():
             error("请通过 -c 提供内容，或通过管道传入")
             raise typer.Exit(1)
-        content = sys.stdin.read()
+        content = sys.stdin.read().strip()
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else extract_tags(content)
 
@@ -100,6 +100,26 @@ def list_cmd(
         return
     print_entry_table(entries)
     info(f"共 {total} 条，显示 {offset + 1}-{offset + len(entries)}")
+
+
+@app.command()
+def update(
+    slug: str = typer.Argument(..., help="条目 slug"),
+    title: str = typer.Option(None, "--title", help="新标题"),
+    content: str = typer.Option(None, "--content", "-c", help="新内容"),
+    tags: str = typer.Option(None, "--tags", "-t", help="新标签，逗号分隔"),
+):
+    """更新已有条目"""
+    from kb.repository import update_entry
+    from kb.utils.console import success, error
+
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+    entry = update_entry(slug, title=title, content_md=content, tags=tag_list)
+    if entry:
+        success(f"已更新: {entry.slug}")
+    else:
+        error(f"未找到条目: {slug}")
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -174,7 +194,7 @@ def export(
     import json
     from kb.search import search as do_search
     from kb.repository import list_entries
-    from kb.utils.console import info
+    from kb.utils.console import info, console as console_print
 
     if query:
         results = do_search(query, limit=limit)
@@ -200,6 +220,6 @@ def export(
             {"title": e.title, "content": e.content_md, "slug": e.slug, "tags": e.tags}
             for e in entries[: len(output_parts)]
         ]
-        print(json.dumps(data, ensure_ascii=False, indent=2))
+        console_print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
-        print("\n---\n".join(output_parts))
+        console_print("\n---\n".join(output_parts))
