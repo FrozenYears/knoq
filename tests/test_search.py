@@ -53,6 +53,17 @@ class TestSearch:
         results = search("条目", limit=2)
         assert len(results) <= 2
 
+    def test_negative_limit_returns_empty(self):
+        add_entry("Docker Guide", "# Docker\nContainer deployment")
+        results = search("Docker", limit=-1)
+        assert results == []
+
+    def test_fts_reserved_word_is_literal(self):
+        add_entry("Logic Operators", "AND OR NOT")
+        results = search("AND")
+        assert len(results) == 1
+        assert results[0].entry.title == "Logic Operators"
+
 
 class TestSearchSpecialChars:
     def test_percent_in_query(self):

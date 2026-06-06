@@ -119,7 +119,7 @@ def init_db() -> None:
     conn = get_connection()
     try:
         conn.executescript(SCHEMA_SQL)
-        _set_schema_version(conn, SCHEMA_VERSION)
+        _run_migrations(conn)
         conn.commit()
     finally:
         conn.close()

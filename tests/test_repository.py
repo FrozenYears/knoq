@@ -57,6 +57,13 @@ class TestUpdateEntry:
         assert entry is not None
         assert entry.content_md == "新内容"
 
+    def test_clear_tags_returns_empty_list(self):
+        entry = add_entry("标签清空", "内容", tags=["old"])
+        updated = update_entry(entry.slug, tags=[])
+        assert updated is not None
+        assert updated.tags == []
+        assert get_entry(entry.slug).tags == []
+
     def test_update_not_found(self):
         assert update_entry("不存在", title="x") is None
 
@@ -83,6 +90,10 @@ class TestListEntries:
         assert count_entries() == 2
         entries = list_entries()
         assert len(entries) == 2
+
+    def test_negative_limit_returns_empty(self):
+        add_entry("A", "a")
+        assert list_entries(limit=-1) == []
 
 
 class TestCountEntries:

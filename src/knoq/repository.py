@@ -96,6 +96,7 @@ def update_entry(slug: str, title: str | None = None, content_md: str | None = N
         new_summary = new_content[:200].split("\n")[0] if new_content else ""
         new_hash = content_hash(new_content)
         new_tags = json.dumps(tags, ensure_ascii=False) if tags is not None else row["tags"]
+        return_tags = tags if tags is not None else json.loads(row["tags"])
         now = Entry.now_iso()
 
         conn.execute(
@@ -108,7 +109,7 @@ def update_entry(slug: str, title: str | None = None, content_md: str | None = N
         return Entry(
             id=row["id"], slug=slug, title=new_title, content_md=new_content,
             summary=new_summary, source_path=row["source_path"], hash=new_hash,
-            tags=tags or json.loads(row["tags"]), created_at=row["created_at"], updated_at=now,
+            tags=return_tags, created_at=row["created_at"], updated_at=now,
         )
     except sqlite3.Error as e:
         raise ValueError(f"数据库错误: {e}") from e
@@ -128,6 +129,9 @@ def get_entry(slug: str) -> Entry | None:
 
 def list_entries(limit: int = 50, offset: int = 0) -> list[Entry]:
     """列出条目"""
+    limit = max(0, limit)
+    offset = max(0, offset)
+
     conn = get_connection()
     try:
         rows = conn.execute(

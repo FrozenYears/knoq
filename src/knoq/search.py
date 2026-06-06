@@ -24,9 +24,9 @@ def _has_cjk(text: str) -> bool:
 
 def _sanitize_fts_query(query: str) -> str:
     """清理 FTS5 查询中的特殊字符"""
-    # FTS5 特殊字符：* " ( ) : ^ - + AND OR NOT NEAR
-    # 保留字母数字和空格，其余替换为空
-    return re.sub(r'[^\w\s]', ' ', query).strip()
+    # FTS5 的 AND/OR/NOT/NEAR 是保留词；逐词引用后按字面量搜索。
+    terms = re.findall(r"\w+", query, re.UNICODE)
+    return " AND ".join(f'"{term}"' for term in terms)
 
 
 def _escape_like(pattern: str) -> str:
@@ -51,6 +51,10 @@ def _make_snippet(content: str, query: str, max_len: int = 120) -> str:
 
 def search(query: str, limit: int = 20) -> list[SearchResult]:
     """全文搜索知识条目（自动处理 CJK 文本）"""
+    limit = max(0, limit)
+    if limit == 0:
+        return []
+
     conn = get_connection()
     try:
         if _has_cjk(query):

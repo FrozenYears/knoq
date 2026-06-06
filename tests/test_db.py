@@ -1,5 +1,6 @@
 """db.py 单元测试"""
 
+from knoq import db
 from knoq.db import get_connection, init_db, optimize_db, SCHEMA_VERSION, _get_schema_version
 
 
@@ -20,6 +21,24 @@ class TestInitDb:
         conn = get_connection()
         try:
             assert _get_schema_version(conn) == SCHEMA_VERSION
+        finally:
+            conn.close()
+
+    def test_runs_pending_migrations(self, monkeypatch):
+        init_db()
+        monkeypatch.setattr(db, "SCHEMA_VERSION", 2)
+        monkeypatch.setitem(
+            db.MIGRATIONS,
+            2,
+            ["ALTER TABLE entries ADD COLUMN priority INTEGER NOT NULL DEFAULT 0"],
+        )
+
+        init_db()
+        conn = get_connection()
+        try:
+            columns = [r["name"] for r in conn.execute("PRAGMA table_info(entries)").fetchall()]
+            assert "priority" in columns
+            assert _get_schema_version(conn) == 2
         finally:
             conn.close()
 
