@@ -10,13 +10,14 @@
 import json
 import sys
 
-# 初始化数据库（确保表存在）
-from knoq.db import init_db
-init_db()
-
 from knoq.search import search
 from knoq.repository import add_entry, get_entry, list_entries
-from knoq.models import Entry
+
+# 内容长度上限（与 repository.py 一致）
+_MAX_CONTENT = 100_000
+_MAX_TITLE = 500
+_MAX_LIMIT = 100
+
 
 # MCP 工具定义
 TOOLS = [
@@ -76,22 +77,31 @@ TOOLS = [
 ]
 
 
+def _require(params: dict, *keys: str) -> None:
+    """验证必需参数存在且非空"""
+    for key in keys:
+        if key not in params or params[key] is None or params[key] == "":
+            raise ValueError(f"缺少必需参数: {key}")
+
+
 def handle_search_knowledge(params: dict) -> str:
     """处理 search_knowledge 调用"""
-    query = params["query"]
-    limit = params.get("limit", 10)
+    _require(params, "query")
+    query = str(params["query"]).strip()
+    limit = min(int(params.get("limit", 10)), _MAX_LIMIT)
     results = search(query, limit=limit)
     if not results:
         return f"未找到与 '{query}' 相关的知识"
-    parts = []
-    for r in results:
-        parts.append(f"### {r.entry.title} (slug: {r.entry.slug})\n{r.snippet}")
-    return "\n\n".join(parts)
+    return "\n\n".join(
+        f"### {r.entry.title} (slug: {r.entry.slug})\n{r.snippet}"
+        for r in results
+    )
 
 
 def handle_get_topic(params: dict) -> str:
     """处理 get_topic 调用"""
-    slug = params["slug"]
+    _require(params, "slug")
+    slug = str(params["slug"]).strip()
     entry = get_entry(slug)
     if not entry:
         return f"未找到条目: {slug}"
@@ -100,9 +110,12 @@ def handle_get_topic(params: dict) -> str:
 
 def handle_add_knowledge(params: dict) -> str:
     """处理 add_knowledge 调用"""
-    title = params["title"]
-    content = params["content"]
+    _require(params, "title", "content")
+    title = str(params["title"]).strip()[:_MAX_TITLE]
+    content = str(params["content"])[:_MAX_CONTENT]
     tags = params.get("tags", [])
+    if not isinstance(tags, list):
+        tags = []
     try:
         entry = add_entry(title=title, content_md=content, tags=tags)
         return f"已添加: {entry.slug}"
@@ -112,9 +125,9 @@ def handle_add_knowledge(params: dict) -> str:
 
 def handle_export_context(params: dict) -> str:
     """处理 export_context 调用"""
-    query = params.get("query", "")
-    limit = params.get("limit", 10)
-    budget = params.get("budget", 2000)
+    query = str(params.get("query", "")).strip()
+    limit = min(int(params.get("limit", 10)), _MAX_LIMIT)
+    budget = min(int(params.get("budget", 2000)), 100_000)
 
     if query:
         results = search(query, limit=limit)
@@ -185,8 +198,10 @@ def handle_request(request: dict) -> dict:
             return make_response(req_id, {
                 "content": [{"type": "text", "text": result_text}],
             })
-        except Exception as e:
-            return make_error(req_id, -32000, str(e))
+        except ValueError as e:
+            return make_error(req_id, -32602, str(e))
+        except Exception:
+            return make_error(req_id, -32000, "内部错误")
 
     if method == "ping":
         return make_response(req_id, {})
@@ -196,6 +211,9 @@ def handle_request(request: dict) -> dict:
 
 def main():
     """MCP stdio 服务器主循环"""
+    from knoq.db import init_db
+    init_db()
+
     for line in sys.stdin:
         line = line.strip()
         if not line:

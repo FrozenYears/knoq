@@ -1,6 +1,11 @@
 """Typer CLI 主入口"""
 
+import os
+from pathlib import Path
+
 import typer
+
+from knoq import __version__
 
 app = typer.Typer(
     name="knoq",
@@ -9,14 +14,33 @@ app = typer.Typer(
 )
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"knoq {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False, "--version", "-v", help="显示版本号",
+        callback=_version_callback, is_eager=True,
+    ),
+) -> None:
+    """knoq — 面向仓库的本地 CLI 知识账本"""
+
+
 @app.command()
 def init():
-    """初始化知识库"""
+    """初始化知识库（在当前目录创建 .knoq/）"""
     from knoq.db import init_db
     from knoq.utils.console import success, info
 
+    knoq_dir = Path.cwd() / ".knoq"
+    os.environ["KNOQ_HOME"] = str(knoq_dir)
     init_db()
     success("知识库已初始化")
+    info(f"数据目录: {knoq_dir}")
     info("使用 'knoq add' 添加知识条目")
 
 
@@ -220,6 +244,6 @@ def export(
             {"title": e.title, "content": e.content_md, "slug": e.slug, "tags": e.tags}
             for e in entries[: len(output_parts)]
         ]
-        console_print(json.dumps(data, ensure_ascii=False, indent=2))
+        console_print.print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
-        console_print("\n---\n".join(output_parts))
+        console_print.print("\n---\n".join(output_parts))

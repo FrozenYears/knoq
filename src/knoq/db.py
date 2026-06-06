@@ -1,7 +1,6 @@
 """SQLite 连接、初始化、迁移"""
 
 import sqlite3
-from pathlib import Path
 
 from knoq.paths import db_path, ensure_home
 
@@ -58,10 +57,11 @@ END;
 def get_connection() -> sqlite3.Connection:
     """获取数据库连接"""
     ensure_home()
-    conn = sqlite3.connect(str(db_path()))
+    conn = sqlite3.connect(str(db_path()), timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
 

@@ -8,14 +8,31 @@ import sqlite3
 from knoq.db import get_connection
 from knoq.models import Entry
 
+# 内容长度上限
+MAX_CONTENT_LENGTH = 100_000  # 100KB
+MAX_TITLE_LENGTH = 500
+
 
 def make_slug(title: str) -> str:
-    """从标题生成 slug"""
+    """从标题生成 slug
+
+    - ASCII 标题：转小写，空格转连字符
+    - CJK 标题：保留原始字符 + 短 hash 保证唯一性
+    """
     slug = title.lower().strip()
     slug = re.sub(r"[^\w\s-]", "", slug)
     slug = re.sub(r"[\s_]+", "-", slug)
     slug = re.sub(r"-+", "-", slug).strip("-")
-    return slug or "untitled"
+
+    if not slug:
+        return "untitled"
+
+    # CJK 字符保留可读性，追加短 hash 防冲突
+    if any(ord(c) > 127 for c in slug):
+        h = hashlib.md5(title.encode()).hexdigest()[:6]
+        return f"{slug}-{h}"
+
+    return slug
 
 
 def content_hash(content: str) -> str:
@@ -25,6 +42,11 @@ def content_hash(content: str) -> str:
 
 def add_entry(title: str, content_md: str, tags: list[str] | None = None, source_path: str = "") -> Entry:
     """添加知识条目"""
+    if len(content_md) > MAX_CONTENT_LENGTH:
+        raise ValueError(f"内容过长: {len(content_md)} 字符（上限 {MAX_CONTENT_LENGTH}）")
+    if len(title) > MAX_TITLE_LENGTH:
+        raise ValueError(f"标题过长: {len(title)} 字符（上限 {MAX_TITLE_LENGTH}）")
+
     slug = make_slug(title)
     summary = content_md[:200].split("\n")[0] if content_md else ""
     h = content_hash(content_md)
@@ -49,6 +71,8 @@ def add_entry(title: str, content_md: str, tags: list[str] | None = None, source
         )
     except sqlite3.IntegrityError:
         raise ValueError(f"条目 '{slug}' 已存在")
+    except sqlite3.Error as e:
+        raise ValueError(f"数据库错误: {e}") from e
     finally:
         conn.close()
 
@@ -56,6 +80,11 @@ def add_entry(title: str, content_md: str, tags: list[str] | None = None, source
 def update_entry(slug: str, title: str | None = None, content_md: str | None = None,
                  tags: list[str] | None = None) -> Entry | None:
     """更新已有条目"""
+    if content_md is not None and len(content_md) > MAX_CONTENT_LENGTH:
+        raise ValueError(f"内容过长: {len(content_md)} 字符（上限 {MAX_CONTENT_LENGTH}）")
+    if title is not None and len(title) > MAX_TITLE_LENGTH:
+        raise ValueError(f"标题过长: {len(title)} 字符（上限 {MAX_TITLE_LENGTH}）")
+
     conn = get_connection()
     try:
         row = conn.execute("SELECT * FROM entries WHERE slug = ?", (slug,)).fetchone()
@@ -81,6 +110,8 @@ def update_entry(slug: str, title: str | None = None, content_md: str | None = N
             summary=new_summary, source_path=row["source_path"], hash=new_hash,
             tags=tags or json.loads(row["tags"]), created_at=row["created_at"], updated_at=now,
         )
+    except sqlite3.Error as e:
+        raise ValueError(f"数据库错误: {e}") from e
     finally:
         conn.close()
 
@@ -118,6 +149,8 @@ def remove_entry(slug: str) -> bool:
         conn.execute("DELETE FROM entries WHERE id = ?", (row["id"],))
         conn.commit()
         return True
+    except sqlite3.Error as e:
+        raise ValueError(f"数据库错误: {e}") from e
     finally:
         conn.close()
 

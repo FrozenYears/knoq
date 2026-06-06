@@ -22,6 +22,18 @@ def _has_cjk(text: str) -> bool:
     return bool(re.search(r"[一-鿿㐀-䶿]", text))
 
 
+def _sanitize_fts_query(query: str) -> str:
+    """清理 FTS5 查询中的特殊字符"""
+    # FTS5 特殊字符：* " ( ) : ^ - + AND OR NOT NEAR
+    # 保留字母数字和空格，其余替换为空
+    return re.sub(r'[^\w\s]', ' ', query).strip()
+
+
+def _escape_like(pattern: str) -> str:
+    """转义 LIKE 通配符 %、_，使用 / 作为转义符"""
+    return pattern.replace("/", "//").replace("%", "/%").replace("_", "/_")
+
+
 def _make_snippet(content: str, query: str, max_len: int = 120) -> str:
     """从内容中提取包含查询词的摘要片段"""
     idx = content.lower().find(query.lower())
@@ -42,11 +54,12 @@ def search(query: str, limit: int = 20) -> list[SearchResult]:
     conn = get_connection()
     try:
         if _has_cjk(query):
-            like_pattern = f"%{query}%"
+            escaped = _escape_like(query)
+            like_pattern = f"%{escaped}%"
             rows = conn.execute(
                 """
                 SELECT * FROM entries
-                WHERE title LIKE ? OR content_md LIKE ? OR summary LIKE ?
+                WHERE title LIKE ? ESCAPE '/' OR content_md LIKE ? ESCAPE '/' OR summary LIKE ? ESCAPE '/'
                 ORDER BY updated_at DESC LIMIT ?
                 """,
                 (like_pattern, like_pattern, like_pattern, limit),
@@ -56,6 +69,9 @@ def search(query: str, limit: int = 20) -> list[SearchResult]:
                 for r in rows
             ]
         else:
+            fts_query = _sanitize_fts_query(query)
+            if not fts_query:
+                return []
             rows = conn.execute(
                 """
                 SELECT e.*, rank,
@@ -65,7 +81,7 @@ def search(query: str, limit: int = 20) -> list[SearchResult]:
                 WHERE entries_fts MATCH ?
                 ORDER BY rank LIMIT ?
                 """,
-                (query, limit),
+                (fts_query, limit),
             ).fetchall()
             return [
                 SearchResult(entry=Entry.from_row(r), rank=r["rank"], snippet=r["snip"])

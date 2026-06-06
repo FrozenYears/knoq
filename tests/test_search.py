@@ -52,3 +52,15 @@ class TestSearch:
             add_entry(f"条目{i}", f"内容{i}")
         results = search("条目", limit=2)
         assert len(results) <= 2
+
+
+class TestSearchSpecialChars:
+    def test_percent_in_query(self):
+        add_entry("100% complete", "done")
+        results = search("100%")
+        assert len(results) >= 1
+
+    def test_underscore_in_query(self):
+        add_entry("test_case_example", "done")
+        results = search("test_case")
+        assert len(results) >= 1
