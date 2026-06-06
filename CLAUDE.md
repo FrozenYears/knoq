@@ -55,3 +55,10 @@ uv run python -m knoq.mcp_server
 ## Testing
 
 `conftest.py` 用 `monkeypatch.setenv("KNOQ_HOME", tmp_path)` 让每个测试使用独立临时数据库，无需清理。
+
+## Repo Conventions
+
+- 提交信息格式：`类型: 简述`（feat/fix/docs/test/refactor）
+- 分支：`main` 为主分支
+- CI：GitHub Actions，push/PR 时自动运行 `uv run pytest tests/ -v`
+- License：MIT

@@ -1,6 +1,41 @@
+# Python
 __pycache__/
-*.pyc
-.kb/
-.knoq/
-dist/
+*.py[cod]
+*$py.class
 *.egg-info/
+*.egg
+dist/
+build/
+eggs/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# knoq 数据目录
+.knoq/
+.kb/
+
+# Skills（不提交到仓库）
+.agents/
+.claude/
+skills-lock.json
