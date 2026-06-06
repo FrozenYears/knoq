@@ -5,8 +5,8 @@ import json
 import re
 import sqlite3
 
-from kb.db import get_connection
-from kb.models import Entry
+from knoq.db import get_connection
+from knoq.models import Entry
 
 
 def make_slug(title: str) -> str:

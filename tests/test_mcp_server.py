@@ -1,7 +1,7 @@
 """mcp_server.py 单元测试"""
 
 import json
-from kb.mcp_server import handle_request
+from knoq.mcp_server import handle_request
 
 
 def _call(method, params=None, req_id=1):
@@ -46,7 +46,7 @@ class TestGetTopic:
         # 先添加
         _call("tools/call", {"name": "add_knowledge", "arguments": {"title": "详情测试", "content": "# 详情\n内容"}})
         # 通过 list 获取 slug
-        from kb.repository import list_entries
+        from knoq.repository import list_entries
         slug = list_entries()[0].slug
         resp = _call("tools/call", {"name": "get_topic", "arguments": {"slug": slug}})
         assert "详情" in resp["result"]["content"][0]["text"]

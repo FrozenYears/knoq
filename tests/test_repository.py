@@ -1,6 +1,6 @@
 """repository.py 单元测试"""
 
-from kb.repository import add_entry, get_entry, list_entries, remove_entry, update_entry, count_entries, make_slug
+from knoq.repository import add_entry, get_entry, list_entries, remove_entry, update_entry, count_entries, make_slug
 
 
 class TestMakeSlug:

@@ -1,7 +1,7 @@
 """search.py 单元测试"""
 
-from kb.repository import add_entry
-from kb.search import search, _has_cjk, _make_snippet
+from knoq.repository import add_entry
+from knoq.search import search, _has_cjk, _make_snippet
 
 
 class TestHasCjk:

@@ -1,4 +1,4 @@
-"""kb MCP Server - 基于 stdio 的 JSON-RPC MCP 服务器
+"""knoq MCP Server - 基于 stdio 的 JSON-RPC MCP 服务器
 
 提供 4 个工具供 AI Agent 调用：
 - search_knowledge: 搜索知识
@@ -11,12 +11,12 @@ import json
 import sys
 
 # 初始化数据库（确保表存在）
-from kb.db import init_db
+from knoq.db import init_db
 init_db()
 
-from kb.search import search
-from kb.repository import add_entry, get_entry, list_entries
-from kb.models import Entry
+from knoq.search import search
+from knoq.repository import add_entry, get_entry, list_entries
+from knoq.models import Entry
 
 # MCP 工具定义
 TOOLS = [
@@ -165,7 +165,7 @@ def handle_request(request: dict) -> dict:
         return make_response(req_id, {
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "kb-mcp-server", "version": "0.1.0"},
+            "serverInfo": {"name": "knoq-mcp-server", "version": "0.1.0"},
         })
 
     if method == "notifications/initialized":

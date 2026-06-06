@@ -3,7 +3,7 @@
 import sqlite3
 from pathlib import Path
 
-from kb.paths import db_path, ensure_home
+from knoq.paths import db_path, ensure_home
 
 # 建表 SQL
 SCHEMA_SQL = """\

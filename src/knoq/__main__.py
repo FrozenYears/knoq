@@ -1,5 +1,5 @@
 """允许 python -m kb 启动"""
 
-from kb.cli import app
+from knoq.cli import app
 
 app()

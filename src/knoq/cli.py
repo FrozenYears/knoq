@@ -3,7 +3,7 @@
 import typer
 
 app = typer.Typer(
-    name="kb",
+    name="knoq",
     help="面向仓库的本地 CLI 知识账本",
     no_args_is_help=True,
 )
@@ -12,12 +12,12 @@ app = typer.Typer(
 @app.command()
 def init():
     """初始化知识库"""
-    from kb.db import init_db
-    from kb.utils.console import success, info
+    from knoq.db import init_db
+    from knoq.utils.console import success, info
 
     init_db()
     success("知识库已初始化")
-    info("使用 'kb add' 添加知识条目")
+    info("使用 'knoq add' 添加知识条目")
 
 
 @app.command()
@@ -29,9 +29,9 @@ def add(
 ):
     """添加一条知识条目"""
     import sys
-    from kb.repository import add_entry
-    from kb.markdown import extract_tags
-    from kb.utils.console import success, error
+    from knoq.repository import add_entry
+    from knoq.markdown import extract_tags
+    from knoq.utils.console import success, error
 
     if not content:
         if sys.stdin.isatty():
@@ -55,8 +55,8 @@ def search(
     limit: int = typer.Option(20, "--limit", "-n", help="返回条数"),
 ):
     """搜索知识"""
-    from kb.search import search as do_search
-    from kb.utils.console import console, error
+    from knoq.search import search as do_search
+    from knoq.utils.console import console, error
 
     results = do_search(query, limit=limit)
     if not results:
@@ -74,8 +74,8 @@ def show(
     slug: str = typer.Argument(..., help="条目 slug"),
 ):
     """查看条目详情"""
-    from kb.repository import get_entry
-    from kb.utils.console import print_entry_detail, error
+    from knoq.repository import get_entry
+    from knoq.utils.console import print_entry_detail, error
 
     entry = get_entry(slug)
     if not entry:
@@ -90,13 +90,13 @@ def list_cmd(
     offset: int = typer.Option(0, "--offset", help="偏移量"),
 ):
     """列出知识条目"""
-    from kb.repository import list_entries, count_entries
-    from kb.utils.console import print_entry_table, info
+    from knoq.repository import list_entries, count_entries
+    from knoq.utils.console import print_entry_table, info
 
     entries = list_entries(limit=limit, offset=offset)
     total = count_entries()
     if not entries:
-        info("知识库为空，使用 'kb add' 添加条目")
+        info("知识库为空，使用 'knoq add' 添加条目")
         return
     print_entry_table(entries)
     info(f"共 {total} 条，显示 {offset + 1}-{offset + len(entries)}")
@@ -110,8 +110,8 @@ def update(
     tags: str = typer.Option(None, "--tags", "-t", help="新标签，逗号分隔"),
 ):
     """更新已有条目"""
-    from kb.repository import update_entry
-    from kb.utils.console import success, error
+    from knoq.repository import update_entry
+    from knoq.utils.console import success, error
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
     entry = update_entry(slug, title=title, content_md=content, tags=tag_list)
@@ -128,8 +128,8 @@ def remove(
     force: bool = typer.Option(False, "--force", "-f", help="跳过确认"),
 ):
     """删除知识条目"""
-    from kb.repository import remove_entry
-    from kb.utils.console import success, error
+    from knoq.repository import remove_entry
+    from knoq.utils.console import success, error
 
     if not force:
         confirm = typer.confirm(f"确认删除 '{slug}'?")
@@ -150,9 +150,9 @@ def scan(
 ):
     """扫描项目自动提取知识"""
     from pathlib import Path
-    from kb.markdown import scan_project_files
-    from kb.repository import add_entry
-    from kb.utils.console import success, info, error
+    from knoq.markdown import scan_project_files
+    from knoq.repository import add_entry
+    from knoq.utils.console import success, info, error
 
     root = Path(path).resolve()
     if not root.is_dir():
@@ -192,9 +192,9 @@ def export(
 ):
     """导出 Agent 友好的上下文"""
     import json
-    from kb.search import search as do_search
-    from kb.repository import list_entries
-    from kb.utils.console import info, console as console_print
+    from knoq.search import search as do_search
+    from knoq.repository import list_entries
+    from knoq.utils.console import info, console as console_print
 
     if query:
         results = do_search(query, limit=limit)

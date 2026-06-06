@@ -4,8 +4,8 @@ import re
 import sqlite3
 from dataclasses import dataclass
 
-from kb.db import get_connection
-from kb.models import Entry
+from knoq.db import get_connection
+from knoq.models import Entry
 
 
 @dataclass

@@ -1,6 +1,6 @@
 """markdown.py 单元测试"""
 
-from kb.markdown import extract_title, extract_tags, extract_summary
+from knoq.markdown import extract_title, extract_tags, extract_summary
 
 
 class TestExtractTitle:
