@@ -45,6 +45,28 @@ def init():
 
 
 @app.command()
+def optimize():
+    """优化数据库：重建 FTS 索引、WAL checkpoint、更新统计"""
+    from knoq.db import optimize_db
+    from knoq.utils.console import success, info
+
+    def _fmt(size: int) -> str:
+        if size < 1024:
+            return f"{size}B"
+        elif size < 1024 * 1024:
+            return f"{size / 1024:.1f}KB"
+        else:
+            return f"{size / (1024 * 1024):.1f}MB"
+
+    result = optimize_db()
+    success("数据库已优化")
+    info(f"条目数: {result['entries']}")
+    info(f"优化前: {_fmt(result['size_before'])} -> 优化后: {_fmt(result['size_after'])}")
+    if result["saved"] > 0:
+        info(f"节省: {_fmt(result['saved'])}")
+
+
+@app.command()
 def add(
     title: str = typer.Argument(..., help="条目标题"),
     content: str = typer.Option("", "--content", "-c", help="Markdown 内容"),

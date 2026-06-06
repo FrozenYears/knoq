@@ -17,6 +17,10 @@ from knoq.repository import add_entry, get_entry, list_entries
 _MAX_CONTENT = 100_000
 _MAX_TITLE = 500
 _MAX_LIMIT = 100
+_MAX_RESPONSE = 500_000  # MCP 单次响应最大 500KB
+
+
+# MCP 工具定义
 
 
 # MCP 工具定义
@@ -168,6 +172,13 @@ def make_error(req_id, code, message):
     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
 
 
+def _truncate(text: str, max_len: int = _MAX_RESPONSE) -> str:
+    """截断响应文本，防止上下文窗口溢出"""
+    if len(text) <= max_len:
+        return text
+    return text[:max_len] + f"\n\n[已截断：原始长度 {len(text)} 字符，已展示前 {max_len} 字符]"
+
+
 def handle_request(request: dict) -> dict:
     """处理一个 JSON-RPC 请求"""
     method = request.get("method", "")
@@ -194,7 +205,7 @@ def handle_request(request: dict) -> dict:
         if not handler:
             return make_error(req_id, -32601, f"未知工具: {tool_name}")
         try:
-            result_text = handler(tool_args)
+            result_text = _truncate(handler(tool_args))
             return make_response(req_id, {
                 "content": [{"type": "text", "text": result_text}],
             })
