@@ -43,6 +43,7 @@ kb export "Docker" --format json --budget 2000
 | `kb search <query>` | 搜索知识 | `kb search "关键词"` |
 | `kb show <slug>` | 查看详情 | `kb show 标题` |
 | `kb list` | 列出条目 | `kb list --limit 20` |
+| `kb update <slug>` | 更新条目 | `kb update 标题 -c "新内容"` |
 | `kb remove <slug>` | 删除条目 | `kb remove 标题 -f` |
 | `kb scan` | 扫描项目 | `kb scan --dry-run` |
 | `kb export` | 导出上下文 | `kb export "查询" --format json` |
@@ -57,8 +58,47 @@ kb export "auth" --budget 1500
 kb scan --changed
 ```
 
-### MCP Server（规划中）
-提供 `search_knowledge`、`get_topic`、`add_knowledge`、`export_context` 四个工具。
+### MCP Server
+
+kb 内置 MCP stdio 服务器，提供 4 个工具：
+
+| 工具 | 功能 |
+|------|------|
+| `search_knowledge` | 搜索本地知识库 |
+| `get_topic` | 获取条目详情 |
+| `add_knowledge` | 添加知识条目 |
+| `export_context` | 导出 Agent 上下文 |
+
+**在 Claude Code 中配置：**
+
+```json
+// .claude/settings.json
+{
+  "mcpServers": {
+    "kb": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "kb.mcp_server"],
+      "cwd": "/path/to/your/project"
+    }
+  }
+}
+```
+
+**在 Codex 中配置：**
+
+```toml
+# ~/.codex/config.toml
+[mcp_servers.kb]
+type = "stdio"
+command = "uv"
+args = ["run", "python", "-m", "kb.mcp_server"]
+```
+
+**手动测试：**
+
+```bash
+echo '{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}' | uv run python -m kb.mcp_server
+```
 
 ## 技术栈
 
