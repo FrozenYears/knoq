@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS entries (
     title TEXT NOT NULL,
     content_md TEXT NOT NULL,
     summary TEXT NOT NULL DEFAULT '',
-    source_path TEXT NOT NULL UNIQUE,
+    source_path TEXT NOT NULL DEFAULT '',
     hash TEXT NOT NULL,
     tags TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL,
@@ -23,8 +23,9 @@ CREATE TABLE IF NOT EXISTS entries (
 
 CREATE INDEX IF NOT EXISTS idx_entries_updated_at ON entries(updated_at);
 CREATE INDEX IF NOT EXISTS idx_entries_title ON entries(title);
+CREATE INDEX IF NOT EXISTS idx_entries_source_path ON entries(source_path);
 
--- FTS5 全文搜索虚拟表
+-- FTS5 全文搜索虚拟表（external content 模式）
 CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
     title,
     content_md,
@@ -33,6 +34,24 @@ CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
     content_rowid='id',
     tokenize='unicode61'
 );
+
+-- FTS 自动同步触发器
+CREATE TRIGGER IF NOT EXISTS entries_ai AFTER INSERT ON entries BEGIN
+    INSERT INTO entries_fts(rowid, title, content_md, summary)
+    VALUES (new.id, new.title, new.content_md, new.summary);
+END;
+
+CREATE TRIGGER IF NOT EXISTS entries_ad AFTER DELETE ON entries BEGIN
+    INSERT INTO entries_fts(entries_fts, rowid, title, content_md, summary)
+    VALUES ('delete', old.id, old.title, old.content_md, old.summary);
+END;
+
+CREATE TRIGGER IF NOT EXISTS entries_au AFTER UPDATE ON entries BEGIN
+    INSERT INTO entries_fts(entries_fts, rowid, title, content_md, summary)
+    VALUES ('delete', old.id, old.title, old.content_md, old.summary);
+    INSERT INTO entries_fts(rowid, title, content_md, summary)
+    VALUES (new.id, new.title, new.content_md, new.summary);
+END;
 """
 
 

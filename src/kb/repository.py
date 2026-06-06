@@ -43,12 +43,6 @@ def add_entry(title: str, content_md: str, tags: list[str] | None = None, source
             (slug, title, content_md, summary, source_path, h, json.dumps(tags, ensure_ascii=False), now, now),
         )
         rowid = cursor.lastrowid
-
-        # 同步 FTS
-        conn.execute(
-            "INSERT INTO entries_fts(rowid, title, content_md, summary) VALUES (?, ?, ?, ?)",
-            (rowid, title, content_md, summary),
-        )
         conn.commit()
 
         return Entry(
@@ -92,12 +86,7 @@ def remove_entry(slug: str) -> bool:
         row = conn.execute("SELECT id FROM entries WHERE slug = ?", (slug,)).fetchone()
         if not row:
             return False
-        entry_id = row["id"]
-        conn.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
-        conn.execute(
-            "INSERT INTO entries_fts(entries_fts, rowid, title, content_md, summary) VALUES ('delete', ?, '', '', '')",
-            (entry_id,),
-        )
+        conn.execute("DELETE FROM entries WHERE id = ?", (row["id"],))
         conn.commit()
         return True
     finally:
