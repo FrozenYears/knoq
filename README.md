@@ -100,13 +100,13 @@ knoq 内置纯标准库 JSON-RPC stdio MCP Server。当前默认协议版本为 
 
 ### Claude Code
 
-推荐使用 Claude Code CLI 一键写入完整 stdio 配置：
+推荐使用 Claude Code CLI 一键添加：
 
 ```powershell
-claude mcp add-json --scope user knoq '{"type":"stdio","command":"uv","args":["--directory","<KNOQ_REPO_PATH>","run","python","-m","knoq.mcp_server"],"env":{}}'
+claude mcp add knoq --scope user -- uv --directory <KNOQ_REPO_PATH> run python -m knoq.mcp_server
 ```
 
-其中 `<KNOQ_REPO_PATH>` 替换为你本机 `knoq` 仓库路径，例如 clone 后的项目目录。Windows 路径写进 JSON 时建议使用正斜杠，例如 `E:/path/to/knoq`；如果使用反斜杠，需要写成 `E:\\path\\to\\knoq`。若只想在当前项目生效，可以把 `--scope user` 改成 `--scope project`。添加后检查：
+其中 `<KNOQ_REPO_PATH>` 替换为你本机 `knoq` 仓库路径，例如 clone 后的项目目录。若只想在当前项目生效，可以把 `--scope user` 改成 `--scope project`。添加后检查：
 
 ```powershell
 claude mcp list
@@ -135,11 +135,7 @@ claude mcp get knoq
 }
 ```
 
-如果偏好普通 `add` 命令，也可以使用：
-
-```powershell
-claude mcp add knoq --scope user -- uv --directory <KNOQ_REPO_PATH> run python -m knoq.mcp_server
-```
+手动写 JSON 时，Windows 路径建议使用正斜杠，例如 `E:/path/to/knoq`；如果使用反斜杠，需要写成 `E:\\path\\to\\knoq`。
 
 ### Codex
 
