@@ -306,6 +306,12 @@ def handle_request(request: dict) -> dict | None:
 
 def main():
     """MCP stdio 服务器主循环"""
+    # Windows 兼容：强制 stdin/stdout 使用 UTF-8
+    if sys.platform == "win32":
+        sys.stdin.reconfigure(encoding="utf-8", errors="replace")
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
     from knoq.db import init_db
     init_db()
 

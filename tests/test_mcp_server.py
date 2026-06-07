@@ -138,6 +138,7 @@ class TestMcpStdio:
             env=env,
             timeout=10,
             check=True,
+            encoding="utf-8",
         )
         responses = [json.loads(line) for line in proc.stdout.splitlines()]
         assert responses[0]["result"]["protocolVersion"] == "2025-11-25"
