@@ -39,14 +39,14 @@ _MAX_RESPONSE = 500_000  # MCP 单次响应最大 500KB
 TOOLS = [
     {
         "name": "search_knowledge",
-        "description": "搜索本地知识库，返回匹配的知识条目",
+        "description": "Search the local knoq knowledge base and return matching entries with slug, tags, source, score, and snippet.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "搜索关键词"},
+                "query": {"type": "string", "description": "Search query text."},
                 "limit": {
                     "type": "integer",
-                    "description": "最大返回条数",
+                    "description": "Maximum number of results to return.",
                     "default": 10,
                     "minimum": 1,
                     "maximum": _MAX_LIMIT,
@@ -58,11 +58,11 @@ TOOLS = [
     },
     {
         "name": "get_topic",
-        "description": "按 slug 获取知识条目详情",
+        "description": "Get the full content of a knowledge entry by slug.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "slug": {"type": "string", "description": "条目 slug", "minLength": 1, "maxLength": _MAX_SLUG},
+                "slug": {"type": "string", "description": "Entry slug.", "minLength": 1, "maxLength": _MAX_SLUG},
             },
             "required": ["slug"],
             "additionalProperties": False,
@@ -70,16 +70,16 @@ TOOLS = [
     },
     {
         "name": "add_knowledge",
-        "description": "添加一条知识到本地知识库",
+        "description": "Add a new knowledge entry to the local knoq knowledge base.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "title": {"type": "string", "description": "条目标题", "minLength": 1, "maxLength": MAX_TITLE_LENGTH},
-                "content": {"type": "string", "description": "Markdown 格式内容", "maxLength": MAX_CONTENT_LENGTH},
+                "title": {"type": "string", "description": "Entry title.", "minLength": 1, "maxLength": MAX_TITLE_LENGTH},
+                "content": {"type": "string", "description": "Entry content in Markdown format.", "maxLength": MAX_CONTENT_LENGTH},
                 "tags": {
                     "type": "array",
                     "items": {"type": "string", "maxLength": MAX_TAG_LENGTH},
-                    "description": "标签列表",
+                    "description": "Optional list of tags.",
                     "default": [],
                     "maxItems": MAX_TAGS,
                 },
@@ -90,21 +90,21 @@ TOOLS = [
     },
     {
         "name": "export_context",
-        "description": "导出知识上下文，供 Agent 注入 prompt",
+        "description": "Export Agent-ready context from matching knowledge entries within a character budget.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "搜索查询（空则导出全部）", "default": "", "maxLength": _MAX_QUERY},
+                "query": {"type": "string", "description": "Search query. Leave empty to export recent entries.", "default": "", "maxLength": _MAX_QUERY},
                 "limit": {
                     "type": "integer",
-                    "description": "最大条数",
+                    "description": "Maximum number of entries to include.",
                     "default": 10,
                     "minimum": 1,
                     "maximum": _MAX_LIMIT,
                 },
                 "budget": {
                     "type": "integer",
-                    "description": "最大字符数",
+                    "description": "Maximum output size in characters.",
                     "default": 2000,
                     "minimum": 100,
                     "maximum": _MAX_BUDGET,

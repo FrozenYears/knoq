@@ -100,6 +100,21 @@ knoq 内置纯标准库 JSON-RPC stdio MCP Server。当前默认协议版本为 
 
 ### Claude Code
 
+推荐使用 Claude Code CLI 一键添加：
+
+```powershell
+claude mcp add knoq --scope user -- uv --directory E:\Projects\Mid\Project run python -m knoq.mcp_server
+```
+
+如果只想在当前项目生效，可以把 `--scope user` 改成 `--scope project`。添加后检查：
+
+```powershell
+claude mcp list
+claude mcp get knoq
+```
+
+也可以手动写入 Claude Code 配置：
+
 ```json
 {
   "mcpServers": {
