@@ -11,6 +11,9 @@ from knoq.models import Entry
 # 内容长度上限
 MAX_CONTENT_LENGTH = 100_000  # 100KB
 MAX_TITLE_LENGTH = 500
+MAX_TAGS = 20
+MAX_TAG_LENGTH = 64
+MAX_SOURCE_PATH_LENGTH = 1_000
 
 
 def make_slug(title: str) -> str:
@@ -40,18 +43,49 @@ def content_hash(content: str) -> str:
     return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
+def validate_entry_input(title: str | None = None, tags: list[str] | None = None, source_path: str = "") -> list[str] | None:
+    """校验并规范化条目输入。"""
+    if title is not None:
+        title = title.strip()
+        if not title:
+            raise ValueError("标题不能为空")
+        if len(title) > MAX_TITLE_LENGTH:
+            raise ValueError(f"标题过长: {len(title)} 字符（上限 {MAX_TITLE_LENGTH}）")
+
+    if len(source_path) > MAX_SOURCE_PATH_LENGTH:
+        raise ValueError(f"来源路径过长: {len(source_path)} 字符（上限 {MAX_SOURCE_PATH_LENGTH}）")
+
+    if tags is None:
+        return None
+
+    normalized = []
+    for tag in tags:
+        if not isinstance(tag, str):
+            raise ValueError("标签必须是字符串")
+        tag = tag.strip()
+        if not tag:
+            continue
+        if len(tag) > MAX_TAG_LENGTH:
+            raise ValueError(f"标签过长: {tag[:20]}...（上限 {MAX_TAG_LENGTH}）")
+        normalized.append(tag)
+
+    if len(normalized) > MAX_TAGS:
+        raise ValueError(f"标签过多: {len(normalized)} 个（上限 {MAX_TAGS}）")
+
+    return normalized
+
+
 def add_entry(title: str, content_md: str, tags: list[str] | None = None, source_path: str = "") -> Entry:
     """添加知识条目"""
     if len(content_md) > MAX_CONTENT_LENGTH:
         raise ValueError(f"内容过长: {len(content_md)} 字符（上限 {MAX_CONTENT_LENGTH}）")
-    if len(title) > MAX_TITLE_LENGTH:
-        raise ValueError(f"标题过长: {len(title)} 字符（上限 {MAX_TITLE_LENGTH}）")
+    tags = validate_entry_input(title=title, tags=tags or [], source_path=source_path)
+    title = title.strip()
 
     slug = make_slug(title)
     summary = content_md[:200].split("\n")[0] if content_md else ""
     h = content_hash(content_md)
     now = Entry.now_iso()
-    tags = tags or []
 
     conn = get_connection()
     try:
@@ -82,8 +116,9 @@ def update_entry(slug: str, title: str | None = None, content_md: str | None = N
     """更新已有条目"""
     if content_md is not None and len(content_md) > MAX_CONTENT_LENGTH:
         raise ValueError(f"内容过长: {len(content_md)} 字符（上限 {MAX_CONTENT_LENGTH}）")
-    if title is not None and len(title) > MAX_TITLE_LENGTH:
-        raise ValueError(f"标题过长: {len(title)} 字符（上限 {MAX_TITLE_LENGTH}）")
+    tags = validate_entry_input(title=title, tags=tags)
+    if title is not None:
+        title = title.strip()
 
     conn = get_connection()
     try:

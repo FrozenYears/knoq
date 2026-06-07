@@ -10,13 +10,25 @@
 import json
 import sys
 
+from knoq.context import render_entry, render_entries_text
 from knoq.search import search
-from knoq.repository import add_entry, get_entry, list_entries
+from knoq.repository import (
+    MAX_CONTENT_LENGTH,
+    MAX_TAG_LENGTH,
+    MAX_TAGS,
+    MAX_TITLE_LENGTH,
+    add_entry,
+    get_entry,
+    list_entries,
+)
 
-# 内容长度上限（与 repository.py 一致）
-_MAX_CONTENT = 100_000
-_MAX_TITLE = 500
+_SUPPORTED_PROTOCOL_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
+_DEFAULT_PROTOCOL_VERSION = _SUPPORTED_PROTOCOL_VERSIONS[0]
 _MAX_LIMIT = 100
+_MAX_BUDGET = 100_000
+_MAX_QUERY = 500
+_MAX_SLUG = 500
+_MAX_REQUEST = 1_000_000
 _MAX_RESPONSE = 500_000  # MCP 单次响应最大 500KB
 
 
@@ -32,9 +44,16 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "搜索关键词"},
-                "limit": {"type": "integer", "description": "最大返回条数", "default": 10},
+                "limit": {
+                    "type": "integer",
+                    "description": "最大返回条数",
+                    "default": 10,
+                    "minimum": 1,
+                    "maximum": _MAX_LIMIT,
+                },
             },
             "required": ["query"],
+            "additionalProperties": False,
         },
     },
     {
@@ -43,9 +62,10 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "slug": {"type": "string", "description": "条目 slug"},
+                "slug": {"type": "string", "description": "条目 slug", "minLength": 1, "maxLength": _MAX_SLUG},
             },
             "required": ["slug"],
+            "additionalProperties": False,
         },
     },
     {
@@ -54,16 +74,18 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "title": {"type": "string", "description": "条目标题"},
-                "content": {"type": "string", "description": "Markdown 格式内容"},
+                "title": {"type": "string", "description": "条目标题", "minLength": 1, "maxLength": MAX_TITLE_LENGTH},
+                "content": {"type": "string", "description": "Markdown 格式内容", "maxLength": MAX_CONTENT_LENGTH},
                 "tags": {
                     "type": "array",
-                    "items": {"type": "string"},
+                    "items": {"type": "string", "maxLength": MAX_TAG_LENGTH},
                     "description": "标签列表",
                     "default": [],
+                    "maxItems": MAX_TAGS,
                 },
             },
             "required": ["title", "content"],
+            "additionalProperties": False,
         },
     },
     {
@@ -72,10 +94,23 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "搜索查询（空则导出全部）", "default": ""},
-                "limit": {"type": "integer", "description": "最大条数", "default": 10},
-                "budget": {"type": "integer", "description": "最大字符数", "default": 2000},
+                "query": {"type": "string", "description": "搜索查询（空则导出全部）", "default": "", "maxLength": _MAX_QUERY},
+                "limit": {
+                    "type": "integer",
+                    "description": "最大条数",
+                    "default": 10,
+                    "minimum": 1,
+                    "maximum": _MAX_LIMIT,
+                },
+                "budget": {
+                    "type": "integer",
+                    "description": "最大字符数",
+                    "default": 2000,
+                    "minimum": 100,
+                    "maximum": _MAX_BUDGET,
+                },
             },
+            "additionalProperties": False,
         },
     },
 ]
@@ -88,50 +123,90 @@ def _require(params: dict, *keys: str) -> None:
             raise ValueError(f"缺少必需参数: {key}")
 
 
+def _str_param(params: dict, key: str, max_len: int, required: bool = False) -> str:
+    """读取并校验字符串参数。"""
+    if required:
+        _require(params, key)
+    value = str(params.get(key, "")).strip()
+    if required and not value:
+        raise ValueError(f"缺少必需参数: {key}")
+    if len(value) > max_len:
+        raise ValueError(f"{key} 过长: {len(value)} 字符（上限 {max_len}）")
+    return value
+
+
+def _int_param(params: dict, key: str, default: int, minimum: int, maximum: int) -> int:
+    """读取并校验整数参数。"""
+    raw = params.get(key, default)
+    if isinstance(raw, bool):
+        raise ValueError(f"{key} 必须是整数")
+    try:
+        value = int(raw)
+    except (TypeError, ValueError) as err:
+        raise ValueError(f"{key} 必须是整数") from err
+    if value < minimum or value > maximum:
+        raise ValueError(f"{key} 必须在 {minimum}-{maximum} 之间")
+    return value
+
+
+def _tags_param(params: dict) -> list[str]:
+    """读取并校验标签参数。"""
+    tags = params.get("tags", [])
+    if not isinstance(tags, list):
+        raise ValueError("tags 必须是字符串数组")
+    normalized = []
+    for tag in tags:
+        if not isinstance(tag, str):
+            raise ValueError("tags 必须是字符串数组")
+        tag = tag.strip()
+        if tag:
+            normalized.append(tag)
+    if len(normalized) > MAX_TAGS:
+        raise ValueError(f"tags 最多 {MAX_TAGS} 个")
+    if any(len(tag) > MAX_TAG_LENGTH for tag in normalized):
+        raise ValueError(f"单个 tag 最多 {MAX_TAG_LENGTH} 字符")
+    return normalized
+
+
 def handle_search_knowledge(params: dict) -> str:
     """处理 search_knowledge 调用"""
-    _require(params, "query")
-    query = str(params["query"]).strip()
-    limit = min(int(params.get("limit", 10)), _MAX_LIMIT)
+    query = _str_param(params, "query", _MAX_QUERY, required=True)
+    limit = _int_param(params, "limit", 10, 1, _MAX_LIMIT)
     results = search(query, limit=limit)
     if not results:
         return f"未找到与 '{query}' 相关的知识"
     return "\n\n".join(
-        f"### {r.entry.title} (slug: {r.entry.slug})\n{r.snippet}"
+        f"### {r.entry.title}\n- slug: {r.entry.slug}\n- tags: {', '.join(r.entry.tags) or 'none'}\n- source: {r.entry.source_path or 'manual'}\n- score: {r.rank:.4f}\n\n{r.snippet}"
         for r in results
     )
 
 
 def handle_get_topic(params: dict) -> str:
     """处理 get_topic 调用"""
-    _require(params, "slug")
-    slug = str(params["slug"]).strip()
+    slug = _str_param(params, "slug", _MAX_SLUG, required=True)
     entry = get_entry(slug)
     if not entry:
         return f"未找到条目: {slug}"
-    return f"# {entry.title}\n\n{entry.content_md}\n\n标签: {', '.join(entry.tags)}"
+    return render_entry(entry)
 
 
 def handle_add_knowledge(params: dict) -> str:
     """处理 add_knowledge 调用"""
-    _require(params, "title", "content")
-    title = str(params["title"]).strip()[:_MAX_TITLE]
-    content = str(params["content"])[:_MAX_CONTENT]
-    tags = params.get("tags", [])
-    if not isinstance(tags, list):
-        tags = []
+    title = _str_param(params, "title", MAX_TITLE_LENGTH, required=True)
+    content = _str_param(params, "content", MAX_CONTENT_LENGTH, required=True)
+    tags = _tags_param(params)
     try:
         entry = add_entry(title=title, content_md=content, tags=tags)
-        return f"已添加: {entry.slug}"
+        return f"已添加: {entry.slug}\n\n{render_entry(entry, include_content=False)}"
     except ValueError as e:
         return str(e)
 
 
 def handle_export_context(params: dict) -> str:
     """处理 export_context 调用"""
-    query = str(params.get("query", "")).strip()
-    limit = min(int(params.get("limit", 10)), _MAX_LIMIT)
-    budget = min(int(params.get("budget", 2000)), 100_000)
+    query = _str_param(params, "query", _MAX_QUERY)
+    limit = _int_param(params, "limit", 10, 1, _MAX_LIMIT)
+    budget = _int_param(params, "budget", 2000, 100, _MAX_BUDGET)
 
     if query:
         results = search(query, limit=limit)
@@ -142,15 +217,7 @@ def handle_export_context(params: dict) -> str:
     if not entries:
         return "无可导出的知识"
 
-    parts = []
-    total_len = 0
-    for e in entries:
-        part = f"## {e.title}\n\n{e.content_md}"
-        if total_len + len(part) > budget:
-            break
-        parts.append(part)
-        total_len += len(part)
-    return "\n\n---\n\n".join(parts)
+    return render_entries_text(entries, budget)
 
 
 # 工具处理器映射
@@ -179,15 +246,28 @@ def _truncate(text: str, max_len: int = _MAX_RESPONSE) -> str:
     return text[:max_len] + f"\n\n[已截断：原始长度 {len(text)} 字符，已展示前 {max_len} 字符]"
 
 
-def handle_request(request: dict) -> dict:
+def handle_request(request: dict) -> dict | None:
     """处理一个 JSON-RPC 请求"""
+    if not isinstance(request, dict):
+        return make_error(None, -32600, "Invalid Request")
+
     method = request.get("method", "")
     req_id = request.get("id")
     params = request.get("params", {})
+    if params is None:
+        params = {}
+    if not isinstance(params, dict):
+        return make_error(req_id, -32600, "Invalid params")
 
     if method == "initialize":
+        requested_version = params.get("protocolVersion")
+        protocol_version = (
+            requested_version
+            if requested_version in _SUPPORTED_PROTOCOL_VERSIONS
+            else _DEFAULT_PROTOCOL_VERSION
+        )
         return make_response(req_id, {
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": protocol_version,
             "capabilities": {"tools": {}},
             "serverInfo": {"name": "knoq-mcp-server", "version": "0.1.0"},
         })
@@ -201,6 +281,10 @@ def handle_request(request: dict) -> dict:
     if method == "tools/call":
         tool_name = params.get("name", "")
         tool_args = params.get("arguments", {})
+        if not isinstance(tool_name, str):
+            return make_error(req_id, -32600, "Tool name must be a string")
+        if not isinstance(tool_args, dict):
+            return make_error(req_id, -32600, "Tool arguments must be an object")
         handler = HANDLERS.get(tool_name)
         if not handler:
             return make_error(req_id, -32601, f"未知工具: {tool_name}")
@@ -229,14 +313,22 @@ def main():
         line = line.strip()
         if not line:
             continue
+        if len(line) > _MAX_REQUEST:
+            response = make_error(None, -32600, "Request too large")
+            sys.stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
+            continue
         try:
             request = json.loads(line)
         except json.JSONDecodeError:
+            response = make_error(None, -32700, "Parse error")
+            sys.stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
             continue
 
         response = handle_request(request)
         if response is not None:
-            sys.stdout.write(json.dumps(response) + "\n")
+            sys.stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
             sys.stdout.flush()
 
 

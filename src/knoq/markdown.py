@@ -3,6 +3,8 @@
 import re
 from pathlib import Path
 
+MAX_SCAN_FILE_SIZE = 1_000_000
+
 
 def extract_title(content: str, fallback: str = "untitled") -> str:
     """从 Markdown 内容提取标题（首个 # 标题）"""
@@ -43,8 +45,10 @@ def scan_project_files(root: Path) -> list[dict]:
     results = []
     for filename, category in SCAN_TARGETS.items():
         filepath = root / filename
-        if filepath.exists() and filepath.is_file():
+        if filepath.exists() and filepath.is_file() and not filepath.is_symlink():
             try:
+                if filepath.stat().st_size > MAX_SCAN_FILE_SIZE:
+                    continue
                 content = filepath.read_text(encoding="utf-8", errors="ignore")
                 if content.strip():
                     results.append({

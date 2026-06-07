@@ -98,7 +98,7 @@ def add(
 @app.command()
 def search(
     query: str = typer.Argument(..., help="搜索关键词"),
-    limit: int = typer.Option(20, "--limit", "-n", help="返回条数"),
+    limit: int = typer.Option(20, "--limit", "-n", min=1, max=100, help="返回条数"),
 ):
     """搜索知识"""
     from knoq.search import search as do_search
@@ -132,8 +132,8 @@ def show(
 
 @app.command("list")
 def list_cmd(
-    limit: int = typer.Option(50, "--limit", "-n", help="返回条数"),
-    offset: int = typer.Option(0, "--offset", help="偏移量"),
+    limit: int = typer.Option(50, "--limit", "-n", min=1, max=500, help="返回条数"),
+    offset: int = typer.Option(0, "--offset", min=0, help="偏移量"),
 ):
     """列出知识条目"""
     from knoq.repository import list_entries, count_entries
@@ -232,15 +232,19 @@ def scan(
 @app.command()
 def export(
     query: str = typer.Argument("", help="搜索查询（空则导出全部）"),
-    limit: int = typer.Option(10, "--limit", "-n", help="最大条数"),
-    budget: int = typer.Option(2000, "--budget", "-b", help="最大字符数"),
+    limit: int = typer.Option(10, "--limit", "-n", min=1, max=100, help="最大条数"),
+    budget: int = typer.Option(2000, "--budget", "-b", min=100, max=100_000, help="最大字符数"),
     format: str = typer.Option("text", "--format", "-f", help="输出格式: text/json"),
 ):
     """导出 Agent 友好的上下文"""
-    import json
     from knoq.search import search as do_search
     from knoq.repository import list_entries
-    from knoq.utils.console import info, console as console_print
+    from knoq.context import render_entries_json, render_entries_text
+    from knoq.utils.console import info, error, console as console_print
+
+    if format not in {"text", "json"}:
+        error("输出格式必须是 text 或 json")
+        raise typer.Exit(1)
 
     if query:
         results = do_search(query, limit=limit)
@@ -252,20 +256,7 @@ def export(
         info("无可导出的知识")
         return
 
-    output_parts = []
-    total_len = 0
-    for e in entries:
-        part = f"## {e.title}\n\n{e.content_md}\n\n来源: {e.source_path or '手动录入'}"
-        if total_len + len(part) > budget:
-            break
-        output_parts.append(part)
-        total_len += len(part)
-
     if format == "json":
-        data = [
-            {"title": e.title, "content": e.content_md, "slug": e.slug, "tags": e.tags}
-            for e in entries[: len(output_parts)]
-        ]
-        console_print.print(json.dumps(data, ensure_ascii=False, indent=2))
+        console_print.print(render_entries_json(entries, budget))
     else:
-        console_print.print("\n---\n".join(output_parts))
+        console_print.print(render_entries_text(entries, budget))

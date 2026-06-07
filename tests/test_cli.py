@@ -60,6 +60,12 @@ class TestSearch:
         result = runner.invoke(app, ["search", "xyznonexistent"])
         assert result.exit_code == 0
 
+    def test_search_rejects_zero_limit(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(app, ["init"])
+        result = runner.invoke(app, ["search", "Docker", "--limit", "0"])
+        assert result.exit_code != 0
+
 
 class TestList:
     def test_empty_list(self, tmp_path, monkeypatch):
@@ -67,6 +73,12 @@ class TestList:
         runner.invoke(app, ["init"])
         result = runner.invoke(app, ["list"])
         assert result.exit_code == 0
+
+    def test_rejects_negative_offset(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(app, ["init"])
+        result = runner.invoke(app, ["list", "--offset", "-1"])
+        assert result.exit_code != 0
 
 
 class TestShow:
@@ -106,6 +118,22 @@ class TestExport:
         runner.invoke(app, ["add", "导出测试", "-c", "导出内容"])
         result = runner.invoke(app, ["export", "导出"])
         assert result.exit_code == 0
+        assert "slug:" in result.output
+
+    def test_export_json_includes_agent_metadata(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["add", "JSON导出测试", "-c", "导出内容", "-t", "agent"])
+        result = runner.invoke(app, ["export", "--format", "json"])
+        assert result.exit_code == 0
+        assert '"slug"' in result.output
+        assert '"summary"' in result.output
+
+    def test_export_rejects_invalid_format(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(app, ["init"])
+        result = runner.invoke(app, ["export", "--format", "xml"])
+        assert result.exit_code == 1
 
 
 class TestScan:

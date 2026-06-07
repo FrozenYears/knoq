@@ -1,6 +1,6 @@
 """markdown.py 单元测试"""
 
-from knoq.markdown import extract_title, extract_tags, extract_summary
+from knoq.markdown import MAX_SCAN_FILE_SIZE, extract_title, extract_tags, extract_summary, scan_project_files
 
 
 class TestExtractTitle:
@@ -41,3 +41,15 @@ class TestExtractSummary:
         content = "# T\n" + "a" * 300
         summary = extract_summary(content, max_len=50)
         assert len(summary) <= 50
+
+
+class TestScanProjectFiles:
+    def test_scans_known_project_file(self, tmp_path):
+        (tmp_path / "README.md").write_text("# Project\nUseful notes", encoding="utf-8")
+        results = scan_project_files(tmp_path)
+        assert len(results) == 1
+        assert results[0]["tags"] == ["project-readme"]
+
+    def test_skips_large_files(self, tmp_path):
+        (tmp_path / "README.md").write_text("x" * (MAX_SCAN_FILE_SIZE + 1), encoding="utf-8")
+        assert scan_project_files(tmp_path) == []

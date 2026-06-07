@@ -22,9 +22,30 @@ class TestAddEntry:
         assert entry.id is not None
         assert entry.slug
 
+    def test_empty_title_raises(self):
+        try:
+            add_entry("  ", "内容")
+            assert False, "应抛出 ValueError"
+        except ValueError:
+            pass
+
     def test_with_tags(self):
         entry = add_entry("标签测试", "内容", tags=["a", "b"])
         assert entry.tags == ["a", "b"]
+
+    def test_too_many_tags_raises(self):
+        try:
+            add_entry("标签过多", "内容", tags=[f"t{i}" for i in range(21)])
+            assert False, "应抛出 ValueError"
+        except ValueError:
+            pass
+
+    def test_non_string_tag_raises(self):
+        try:
+            add_entry("非法标签", "内容", tags=["ok", 1])
+            assert False, "应抛出 ValueError"
+        except ValueError:
+            pass
 
     def test_duplicate_raises(self):
         add_entry("重复", "内容")
@@ -66,6 +87,14 @@ class TestUpdateEntry:
 
     def test_update_not_found(self):
         assert update_entry("不存在", title="x") is None
+
+    def test_update_empty_title_raises(self):
+        entry = add_entry("原标题", "内容")
+        try:
+            update_entry(entry.slug, title="  ")
+            assert False, "应抛出 ValueError"
+        except ValueError:
+            pass
 
 
 class TestRemoveEntry:
