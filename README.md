@@ -103,10 +103,10 @@ knoq 内置纯标准库 JSON-RPC stdio MCP Server。当前默认协议版本为 
 推荐使用 Claude Code CLI 一键添加：
 
 ```powershell
-claude mcp add knoq --scope user -- uv --directory E:\Projects\Mid\Project run python -m knoq.mcp_server
+claude mcp add knoq --scope user -- uv --directory <KNOQ_REPO_PATH> run python -m knoq.mcp_server
 ```
 
-如果只想在当前项目生效，可以把 `--scope user` 改成 `--scope project`。添加后检查：
+其中 `<KNOQ_REPO_PATH>` 替换为你本机 `knoq` 仓库路径，例如 clone 后的项目目录。若只想在当前项目生效，可以把 `--scope user` 改成 `--scope project`。添加后检查：
 
 ```powershell
 claude mcp list
@@ -128,11 +128,26 @@ claude mcp get knoq
 
 ### Codex
 
+推荐使用 Codex CLI 一键添加：
+
+```powershell
+codex mcp add knoq -- uv --directory <KNOQ_REPO_PATH> run python -m knoq.mcp_server
+```
+
+添加后检查：
+
+```powershell
+codex mcp list
+codex mcp get knoq
+```
+
+也可以手动写入 Codex 配置：
+
 ```toml
 [mcp_servers.knoq]
 type = "stdio"
 command = "uv"
-args = ["run", "python", "-m", "knoq.mcp_server"]
+args = ["--directory", "<KNOQ_REPO_PATH>", "run", "python", "-m", "knoq.mcp_server"]
 ```
 
 ### 手动验证
